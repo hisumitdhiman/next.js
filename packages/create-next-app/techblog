@@ -1,0 +1,338 @@
+/pages
+    _app.js
+    index.js
+    /posts
+        [slug].js
+    /events
+        [slug].js
+
+/components
+    Post.js
+    Event.js
+
+/utils
+    wordpress.js
+    utils.js
+
+next.config.js
+
+//_app.js
+
+import '../styles/globals.css';
+import Head from 'next/head';
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <>
+      <Head>
+        {/* you can add metadata here, for all pages */}
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-    beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossOrigin="anonymous"
+        />
+      </Head>
+      <Component {...pageProps} />
+    </>
+  );
+}
+
+export default MyApp;
+//index.js
+
+import Head from 'next/head';
+
+import { getEvents, getPosts } from '../utils/wordpress';
+
+import Post from '../components/Post';
+import Event from '../components/Event';
+
+export default function Home({ posts, events }) {
+  const jsxPosts = posts.map((post) => {
+    const featuredMedia = post['_embedded']['wp:featuredmedia'][0];
+    return <Post post={post} featuredMedia={featuredMedia} key={post.id} />;
+  });
+
+  const jsxEvents = events.map((event) => {
+    const featuredMedia = event['_embedded']['wp:featuredmedia'][0];
+    return <Event event={event} featuredMedia={featuredMedia} key={event.id} />;
+  });
+
+  return (
+    <>
+      <Head>
+        <title>Tech Blog</title>
+        <meta
+          name="description"
+          content="Keep up to date with the latest trends in tech"
+        />
+        <link rel="icon" href="/favicon.ico" />
+        {/* You can add more metadata here, like open graph tags for social media, etc */}
+      </Head>
+
+      <div className="container pt-5">
+        <h1 className="text-center pb-5">Tech Blog</h1>
+        <div className="row">
+          <div className="col-lg-8">
+            <h2 className="pb-3">Our blog posts</h2>
+            {jsxPosts}
+          </div>
+          <div className="col-lg-4">
+            <h2 className="pb-3">Events</h2>
+            {jsxEvents}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export async function getStaticProps({ params }) {
+  const posts = await getPosts();
+  const events = await getEvents();
+  const media = await getMedia();
+
+  return {
+    props: {
+      posts,
+      events,
+    },
+    revalidate: 10, // In seconds
+  };
+}
+// /posts/[slug].js
+
+import Link from 'next/link';
+
+import { getPost, getSlugs } from '../../utils/wordpress';
+
+export default function PostPage({ post }) {
+  return (
+    <div className="container pt-5">
+      <h1 className="text-center pb-5">{post.title.rendered}</h1>
+      <div
+        className="card-text pb-5"
+        dangerouslySetInnerHTML={{ __html: post.content.rendered }}
+      ></div>
+      <Link href="/">
+        <a className="btn btn-primary">Back to Home</a>
+      </Link>
+    </div>
+  );
+}
+
+//hey Next, these are the possible slugs
+export async function getStaticPaths() {
+  const paths = await getSlugs('posts');
+
+  return {
+    paths,
+    //this option below renders in the server (at request time) pages that were not rendered at build time
+    //e.g when a new blogpost is added to the app
+    fallback: 'blocking',
+  };
+}
+
+//access the router, get the id, and get the data for that post
+export async function getStaticProps({ params }) {
+  const post = await getPost(params.slug);
+
+  return {
+    props: {
+      post,
+    },
+    revalidate: 10, // In seconds
+  };
+}
+// /events/[slug].js
+
+import Link from 'next/link';
+
+import { getEvent, getSlugs } from '../../utils/wordpress';
+
+export default function EventPage({ event }) {
+  return (
+    <div className="container pt-5">
+      <h1 className="text-center pb-5">{event.title.rendered}</h1>
+      <div
+        className="card-text pb-5"
+        dangerouslySetInnerHTML={{ __html: event.content.rendered }}
+      ></div>
+      <Link href="/">
+        <a className="btn btn-primary">Back to Home</a>
+      </Link>
+    </div>
+  );
+}
+
+//hey Next, these are the possible slugs
+export async function getStaticPaths() {
+  const paths = await getSlugs('events');
+
+  return {
+    paths,
+    //this option below renders in the server (at request time) pages that were not rendered at build time
+    //e.g when a new blogpost is added to the app
+    fallback: 'blocking',
+  };
+}
+
+//access the router, get the id, and get the medatada for that post
+
+export async function getStaticProps({ params }) {
+  const event = await getEvent(params.slug);
+
+  return {
+    props: {
+      event,
+    },
+    revalidate: 10, // In seconds
+  };
+}
+// /components/Post.js
+
+import Link from 'next/link';
+import Image from 'next/image';
+//to use Image with an external url, add some config on next.config.js
+//for more info, check out these docs https://nextjs.org/docs/basic-features/image-optimization
+
+import { getDate } from '../utils/utils';
+
+export default function Post({ post, featuredMedia }) {
+  return (
+    <div className="card mb-3" style={{ maxWidth: '540px' }}>
+      <div className="row g-0">
+        <div className="col-md-4">
+          <Link href={`/posts/${post.slug}`}>
+            <a>
+              <Image
+                src={featuredMedia['media_details'].sizes.medium['source_url']}
+                width={180}
+                height={120}
+                alt={featuredMedia['alt_text']}
+              />
+            </a>
+          </Link>
+        </div>
+        <div className="col-md-8">
+          <div className="card-body">
+            <h5 className="card-title">{post.title.rendered}</h5>
+            <div
+              className="card-text"
+              dangerouslySetInnerHTML={{ __html: post.excerpt.rendered }}
+            ></div>
+            <p className="card-text">
+              <small className="text-muted">On {getDate(post.modified)}</small>
+            </p>
+            <Link href={`/posts/${post.slug}`}>
+              <a className="btn btn-primary">See more</a>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// /components/Event.js
+
+import Link from 'next/link';
+import Image from 'next/image';
+//to use Image with an external url, add some config on next.config.js
+//for more info, check out these docs https://nextjs.org/docs/basic-features/image-optimization
+
+export default function Event({ event, featuredMedia }) {
+  return (
+    <div className="card mb-3" style={{ width: '18rem' }}>
+      <Link href={`/events/${event.slug}`}>
+        <a>
+          <Image
+            src={featuredMedia['media_details'].sizes.medium['source_url']}
+            width={288}
+            height={190}
+            alt={featuredMedia['alt_text']}
+            className="card-img-top"
+          />
+        </a>
+      </Link>
+      <div className="card-body">
+        <h5 className="card-title">{event.title.rendered}</h5>
+        <div
+          className="card-text"
+          dangerouslySetInnerHTML={{ __html: event.excerpt.rendered }}
+        ></div>
+        <p className="card-text">
+          <small className="text-muted">{event.acf.date}</small>
+        </p>
+        <Link href={`/events/${event.slug}`}>
+          <a className="btn btn-primary">See more</a>
+        </Link>
+      </div>
+    </div>
+  );
+}
+// /utils/wordpress.js
+
+const BASE_URL = 'https://my-wordpress.sportslink.info/wp-json/wp/v2';
+
+export async function getPosts() {
+  const postsRes = await fetch(BASE_URL + '/posts?_embed');
+  const posts = await postsRes.json();
+  return posts;
+}
+
+export async function getPost(slug) {
+  const posts = await getPosts();
+  const postArray = posts.filter((post) => post.slug == slug);
+  const post = postArray.length > 0 ? postArray[0] : null;
+  return post;
+}
+export async function getEvents() {
+  const eventsRes = await fetch(BASE_URL + '/events?_embed');
+  const events = await eventsRes.json();
+  return events;
+}
+
+export async function getEvent(slug) {
+  const events = await getEvents();
+  const eventArray = events.filter((event) => event.slug == slug);
+  const event = eventArray.length > 0 ? eventArray[0] : null;
+  return event;
+}
+
+export async function getSlugs(type) {
+  let elements = [];
+  switch (type) {
+    case 'posts':
+      elements = await getPosts();
+      break;
+    case 'events':
+      elements = await getEvents();
+      break;
+  }
+  const elementsIds = elements.map((element) => {
+    return {
+      params: {
+        slug: element.slug,
+      },
+    };
+  });
+  return elementsIds;
+}
+// utils/utils.js
+
+export function getDate(date) {
+  return new Date(date).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+// next.config.js
+
+module.exports = {
+  images: {
+    //enter the domain or subdomain where you have WordPress installed
+    domains: ['my-wordpress.sportslink.info'],
+  },
+};
